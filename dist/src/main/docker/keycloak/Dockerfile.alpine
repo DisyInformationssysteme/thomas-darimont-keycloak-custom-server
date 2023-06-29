@@ -1,0 +1,50 @@
+ARG ALPINE_VERSION=3.18.0
+FROM alpine:$ALPINE_VERSION as builder
+
+RUN apk add bash binutils openjdk17-jdk --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community && \
+    echo "keycloak:x:0:root" >> /etc/group && \
+    echo "keycloak:x:1000:0:keycloak user:/opt/keycloak:/sbin/nologin" >> /etc/passwd
+
+COPY --chown=keycloak:keycloak maven/keycloak /opt/keycloak
+
+USER 1000
+
+RUN /opt/keycloak/bin/kc.sh build
+
+FROM alpine:$ALPINE_VERSION
+
+RUN apk add bash binutils openjdk17-jdk --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community && \
+    echo "keycloak:x:1000:" >> /etc/group && \
+    echo "keycloak:x:1000:1000:keycloak user:/opt/keycloak:/sbin/nologin" >> /etc/passwd
+
+RUN apk add tzdata bash --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community && \
+    ln -sf /usr/share/zoneinfo/Europe/Berlin /etc/localtime # set timezone
+
+COPY --from=builder --chown=1000:1000 /opt/keycloak /opt/keycloak
+
+RUN echo "Add certificates to cacerts truststore" \
+    && echo "Found the following custom certificates:"\
+    && ls -l /opt/keycloak/conf/certs/*.crt \
+    && echo "Updating cacerts truststore:"\
+    && for crt in /opt/keycloak/conf/certs/*.crt; \
+       do keytool -import -file $crt -cacerts -storepass changeit -alias $(basename -s .crt $crt) -noprompt; done \
+    && echo "Certificates added to cacerts truststore" \
+    || echo "No custom certificates imported."
+
+# RUN echo "Check for custom certificates... "\
+#     && echo "Check for custom-alias1 cert" \
+#     && keytool -list -cacerts -storepass changeit | grep 'custom-alias1' \
+#     && echo "Check for custom-alias2 cert" \
+#     && keytool -list -cacerts -storepass changeit | grep 'custom-alias2' \
+#     || (echo "Error: Some custom certificates could were not imported." && exit 1)
+
+# Note you can check if certs were added with the following commands
+# keytool -list -keystore /etc/pki/java/cacerts -storepass changeit |& head
+# keytool -list -cacerts -storepass changeit |& grep -i mycustomcert
+
+USER 1000
+
+EXPOSE 8080
+EXPOSE 8443
+
+ENTRYPOINT [ "/opt/keycloak/bin/kc.sh" ]
