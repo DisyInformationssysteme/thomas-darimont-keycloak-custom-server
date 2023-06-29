@@ -1,4 +1,4 @@
-ARG ALPINE_VERSION=3.18.0
+ARG ALPINE_VERSION=3.18.2
 FROM alpine:$ALPINE_VERSION as builder
 
 RUN apk add bash binutils openjdk17-jdk --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community && \
