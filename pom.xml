@@ -29,7 +29,7 @@
         <!--              -->
         <!-- Dependencies -->
         <!--              -->
-        <version.keycloak>21.1.1</version.keycloak>
+        <version.keycloak>21.1.2</version.keycloak>
 
     </properties>
 
